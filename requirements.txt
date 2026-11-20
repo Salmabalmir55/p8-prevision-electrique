@@ -1,0 +1,4 @@
+# Point d'entrée unique pour un poste de développement :
+#   python -m pip install -r requirements.txt
+# Les images Docker n'installent que le sous-ensemble utile (requirements/api.txt ou train.txt).
+-r requirements/dev.txt

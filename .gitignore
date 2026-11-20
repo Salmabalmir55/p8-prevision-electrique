@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Secrets et configuration locale
+.env
+
+# Données et artefacts : versionnés par DVC (dvc.lock), pas par Git
+/data/raw/*
+/data/processed/*
+!/data/**/.gitkeep
+/models/*
+!/models/.gitkeep
+
+# Suivi d'expériences local
+mlruns/
+mlflow-data/
+
+# DVC : cache, fichiers temporaires et remote local
+.dvc/cache/
+.dvc/tmp/
+.dvc/remote/
+
+*.log
+
+# Rapport graphique généré par dvc plots show
+dvc_plots/
+
+# Roues pip téléchargées d'avance (volumineuses)
+/wheels/*
+!/wheels/.gitkeep
