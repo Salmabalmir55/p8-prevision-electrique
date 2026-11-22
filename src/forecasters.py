@@ -11,6 +11,7 @@ Une série est une `pandas.Series` de float indexée par des dates quotidiennes 
 
 from __future__ import annotations
 
+import logging
 import math
 import warnings
 from abc import ABC, abstractmethod
@@ -200,6 +201,178 @@ class ArimaForecaster(Forecaster):
             return np.asarray(etat.forecast(steps=horizon, exog=futur))
 
 
+class ProphetForecaster(Forecaster):
+    """Prophet : tendance par morceaux, saisonnalités hebdomadaire et annuelle, jours fériés."""
+
+    name = "prophet"
+
+    def __init__(self, changepoint_prior_scale: float = 0.05, yearly_fourier_order: int = 10):
+        self.changepoint_prior_scale = float(changepoint_prior_scale)
+        self.yearly_fourier_order = int(yearly_fourier_order)
+        self.min_history = 1
+
+    def fit(self, series: pd.Series) -> ProphetForecaster:
+        from prophet import Prophet
+
+        for journal in ("prophet", "cmdstanpy"):
+            logging.getLogger(journal).setLevel(logging.WARNING)
+        check_series(series, 60)
+        modele = Prophet(
+            changepoint_prior_scale=self.changepoint_prior_scale,
+            yearly_seasonality=self.yearly_fourier_order,
+            weekly_seasonality=True,
+            daily_seasonality=False,
+            uncertainty_samples=0,
+        )
+        modele.add_country_holidays(country_name=PAYS_JOURS_FERIES)
+        modele.fit(pd.DataFrame({"ds": series.index, "y": series.to_numpy()}))
+        self.model_ = modele
+        return self
+
+    def _predict(self, history: pd.Series, horizon: int) -> np.ndarray:
+        # Prophet ne dépend que des dates : l'historique fixe seulement le point de départ.
+        dates = future_index(history, horizon)
+        return self.model_.predict(pd.DataFrame({"ds": dates}))["yhat"].to_numpy()
+
+    def __getstate__(self) -> dict:
+        # Sérialisation JSON officielle de Prophet, plus robuste que le pickle brut.
+        from prophet.serialize import model_to_json
+
+        etat = dict(self.__dict__)
+        if "model_" in etat:
+            etat["model_"] = model_to_json(etat["model_"])
+        return etat
+
+    def __setstate__(self, etat: dict) -> None:
+        if isinstance(etat.get("model_"), str):
+            from prophet.serialize import model_from_json
+
+            etat["model_"] = model_from_json(etat["model_"])
+        self.__dict__.update(etat)
+
+
+def _sigmoid(x: np.ndarray) -> np.ndarray:
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def lstm_forward(weights: dict, window: np.ndarray) -> float:
+    """Passe avant d'un LSTM à une couche + couche linéaire, en NumPy pur.
+
+    Reproduit exactement `torch.nn.LSTM` (portes i, f, g, o) : l'API n'a donc pas
+    besoin de PyTorch, ce qui garde son image Docker légère.
+    """
+    w_ih, w_hh = weights["w_ih"], weights["w_hh"]
+    biais = weights["b_ih"] + weights["b_hh"]
+    taille = w_hh.shape[1]
+    h = np.zeros(taille)
+    c = np.zeros(taille)
+    for x_t in window:
+        portes = w_ih @ x_t + w_hh @ h + biais
+        i = _sigmoid(portes[:taille])
+        f = _sigmoid(portes[taille : 2 * taille])
+        g = np.tanh(portes[2 * taille : 3 * taille])
+        o = _sigmoid(portes[3 * taille :])
+        c = f * c + i * g
+        h = o * np.tanh(c)
+    return float(weights["w_out"] @ h + weights["b_out"])
+
+
+class LstmForecaster(Forecaster):
+    """LSTM entraîné avec PyTorch ; prévision récursive jour par jour en NumPy."""
+
+    name = "lstm"
+
+    def __init__(
+        self,
+        window: int = 28,
+        hidden_size: int = 32,
+        epochs: int = 40,
+        learning_rate: float = 0.005,
+        batch_size: int = 64,
+        seed: int = 42,
+    ):
+        self.window = int(window)
+        self.hidden_size = int(hidden_size)
+        self.epochs = int(epochs)
+        self.learning_rate = float(learning_rate)
+        self.batch_size = int(batch_size)
+        self.seed = int(seed)
+        self.min_history = self.window
+
+    def _inputs(self, values: np.ndarray, dates: pd.DatetimeIndex) -> np.ndarray:
+        """Entrées par jour : valeur normalisée, jour de semaine, saison, jour férié."""
+        z = (values - self.mean_) / self.std_
+        semaine = 2 * np.pi * dates.dayofweek.to_numpy() / 7
+        annee = 2 * np.pi * dates.dayofyear.to_numpy() / 365.25
+        return np.column_stack(
+            [z, np.sin(semaine), np.cos(semaine), np.sin(annee), np.cos(annee), holiday_flags(dates)]
+        )
+
+    def fit(self, series: pd.Series) -> LstmForecaster:
+        import torch
+        from torch import nn
+
+        check_series(series, self.window + 60)
+        torch.manual_seed(self.seed)
+        np.random.seed(self.seed)
+        threads = torch.get_num_threads()
+        torch.set_num_threads(1)  # calcul déterministe d'une exécution à l'autre
+
+        self.mean_ = float(series.mean())
+        self.std_ = float(series.std())
+        entrees = self._inputs(series.to_numpy(), series.index)
+        cibles = (series.to_numpy() - self.mean_) / self.std_
+        x = np.stack([entrees[i : i + self.window] for i in range(len(series) - self.window)])
+        y = cibles[self.window :]
+
+        lstm = nn.LSTM(entrees.shape[1], self.hidden_size, batch_first=True)
+        sortie = nn.Linear(self.hidden_size, 1)
+        parametres = list(lstm.parameters()) + list(sortie.parameters())
+        optimiseur = torch.optim.Adam(parametres, lr=self.learning_rate)
+        perte_fn = nn.MSELoss()
+        x_t = torch.tensor(x, dtype=torch.float32)
+        y_t = torch.tensor(y, dtype=torch.float32).unsqueeze(1)
+        generateur = torch.Generator().manual_seed(self.seed)
+
+        try:
+            for _ in range(self.epochs):
+                ordre = torch.randperm(len(x_t), generator=generateur)
+                for debut in range(0, len(ordre), self.batch_size):
+                    lot = ordre[debut : debut + self.batch_size]
+                    optimiseur.zero_grad()
+                    etats, _ = lstm(x_t[lot])
+                    perte = perte_fn(sortie(etats[:, -1, :]), y_t[lot])
+                    perte.backward()
+                    optimiseur.step()
+            with torch.no_grad():
+                etats, _ = lstm(x_t)
+                self.train_loss_ = float(perte_fn(sortie(etats[:, -1, :]), y_t))
+        finally:
+            torch.set_num_threads(threads)
+
+        self.weights_ = {
+            "w_ih": lstm.weight_ih_l0.detach().numpy().astype(float),
+            "w_hh": lstm.weight_hh_l0.detach().numpy().astype(float),
+            "b_ih": lstm.bias_ih_l0.detach().numpy().astype(float),
+            "b_hh": lstm.bias_hh_l0.detach().numpy().astype(float),
+            "w_out": sortie.weight.detach().numpy().astype(float)[0],
+            "b_out": float(sortie.bias.detach().numpy()[0]),
+        }
+        return self
+
+    def _predict(self, history: pd.Series, horizon: int) -> np.ndarray:
+        valeurs = list(history.to_numpy()[-self.window :])
+        dates = list(history.index[-self.window :])
+        prevision = []
+        for date in future_index(history, horizon):
+            entrees = self._inputs(np.array(valeurs[-self.window :]), pd.DatetimeIndex(dates[-self.window :]))
+            valeur = lstm_forward(self.weights_, entrees) * self.std_ + self.mean_
+            prevision.append(valeur)
+            valeurs.append(valeur)
+            dates.append(date)
+        return np.array(prevision)
+
+
 # --------------------------------------------------------------------------- fabrique
 
 MODELES: dict[str, type[Forecaster]] = {
@@ -208,6 +381,8 @@ MODELES: dict[str, type[Forecaster]] = {
         SeasonalNaiveForecaster,
         RidgeForecaster,
         ArimaForecaster,
+        ProphetForecaster,
+        LstmForecaster,
     )
 }
 
