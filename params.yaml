@@ -12,3 +12,14 @@ data:
 split:
   # Découpage chronologique : tout ce qui précède cette date sert à l'apprentissage.
   test_start: "2017-01-01"
+
+models:
+  naive:
+    season: 7
+  ridge:
+    lags: [1, 7, 14]
+    alpha: 1.0
+    fourier_order: 3
+  arima:
+    order: [2, 0, 1]
+    fourier_order: 3
