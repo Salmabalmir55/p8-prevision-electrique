@@ -1,0 +1,54 @@
+schema: '2.0'
+stages:
+  download:
+    cmd: python -m src.download_data
+    deps:
+    - path: src/download_data.py
+      hash: md5
+      md5: 68b96cac52038cf1e86da5db4fed0350
+      size: 2115
+    params:
+      params.yaml:
+        data.sha256: 
+          729b025d984497827cb6b89048d7c2c6a551e7aa727bc47ea0b74a2d1e84675d
+        data.url: 
+          https://raw.githubusercontent.com/jenfly/opsd/master/opsd_germany_daily.csv
+    outs:
+    - path: data/raw/opsd_germany_daily.csv
+      hash: md5
+      md5: f0f446ebbc7638b3c4de1dbebd73f9bb
+      size: 217983
+  prepare:
+    cmd: python -m src.prepare_data
+    deps:
+    - path: data/raw/opsd_germany_daily.csv
+      hash: md5
+      md5: f0f446ebbc7638b3c4de1dbebd73f9bb
+      size: 217983
+    - path: src/common.py
+      hash: md5
+      md5: d5097e4df3ac2ff6a9bf53d1e62926be
+      size: 3531
+    - path: src/prepare_data.py
+      hash: md5
+      md5: f2e428d8b5d27d3129969ea9257aa3ee
+      size: 3787
+    params:
+      params.yaml:
+        data.max_gwh: 2000
+        data.min_gwh: 500
+        split:
+          test_start: '2017-01-01'
+    outs:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 2f8fb9227c2f54d72bee2d431ab15d96
+      size: 9075
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 852b99fe3523b96c63cf392f9d48275c
+      size: 97282
+    - path: reports/data_quality.json
+      hash: md5
+      md5: 16c5e9c879ce0889ca24d0fdd10a94d7
+      size: 278

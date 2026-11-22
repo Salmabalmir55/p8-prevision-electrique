@@ -1,0 +1,29 @@
+# Pipeline DVC. Chaque étape déclare ses dépendances (code, données, clés de params.yaml)
+# et ses sorties : `dvc repro` ne relance que les étapes dont une dépendance a changé.
+stages:
+  download:
+    cmd: python -m src.download_data
+    deps:
+      - src/download_data.py
+    params:
+      - data.url
+      - data.sha256
+    outs:
+      - data/raw/opsd_germany_daily.csv
+
+  prepare:
+    cmd: python -m src.prepare_data
+    deps:
+      - data/raw/opsd_germany_daily.csv
+      - src/common.py
+      - src/prepare_data.py
+    params:
+      - data.min_gwh
+      - data.max_gwh
+      - split
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+    metrics:
+      - reports/data_quality.json:
+          cache: false

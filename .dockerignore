@@ -1,0 +1,19 @@
+# Rien de volumineux ni de sensible dans le contexte de construction.
+.git
+.github
+.venv
+venv
+.env
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.dvc/cache
+.dvc/tmp
+data/raw/*
+data/processed/*
+models/*
+reports/*
+mlruns
+docs
+*.log
