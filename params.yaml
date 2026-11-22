@@ -12,3 +12,32 @@ data:
 split:
   # Découpage chronologique : tout ce qui précède cette date sert à l'apprentissage.
   test_start: "2017-01-01"
+
+models:
+  naive:
+    season: 7
+  ridge:
+    lags: [1, 7, 14]
+    alpha: 1.0
+    fourier_order: 3
+  arima:
+    order: [2, 0, 1]
+    fourier_order: 3
+  prophet:
+    changepoint_prior_scale: 0.05
+    yearly_fourier_order: 10
+  lstm:
+    window: 28
+    hidden_size: 32
+    epochs: 40
+    learning_rate: 0.005
+    batch_size: 64
+    seed: 42
+
+backtest:
+  short:
+    horizon_days: 7
+    step_days: 7
+  long:
+    horizon_days: 180
+    step_days: 30
