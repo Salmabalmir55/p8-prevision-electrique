@@ -1,0 +1,14 @@
+{
+  "raw_rows": 4383,
+  "days": 4383,
+  "start": "2006-01-01",
+  "end": "2017-12-31",
+  "duplicates_removed": 0,
+  "out_of_range_values": 0,
+  "interpolated_days": 0,
+  "min_gwh": 842.395,
+  "max_gwh": 1709.568,
+  "mean_gwh": 1338.676,
+  "train_days": 4018,
+  "test_days": 365
+}

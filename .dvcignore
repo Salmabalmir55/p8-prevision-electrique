@@ -1,0 +1,7 @@
+# Environnements locaux et caches : jamais des dépendances du pipeline.
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+mlruns/
