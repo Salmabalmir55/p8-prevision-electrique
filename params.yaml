@@ -33,3 +33,11 @@ models:
     learning_rate: 0.005
     batch_size: 64
     seed: 42
+
+backtest:
+  short:
+    horizon_days: 7
+    step_days: 7
+  long:
+    horizon_days: 180
+    step_days: 30
