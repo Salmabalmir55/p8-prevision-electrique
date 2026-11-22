@@ -8,3 +8,7 @@ data:
   # Bornes physiquement plausibles ; une valeur hors bornes est traitée comme manquante.
   min_gwh: 500
   max_gwh: 2000
+
+split:
+  # Découpage chronologique : tout ce qui précède cette date sert à l'apprentissage.
+  test_start: "2017-01-01"
