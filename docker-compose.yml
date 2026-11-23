@@ -1,0 +1,59 @@
+# Suivi d'expériences et pipeline :
+#
+#   docker compose up --build -d
+#
+# Ordre de démarrage : mlflow (sain) -> pipeline (dvc repro, traces envoyées au serveur MLflow).
+
+# Nom de projet fixe : conteneurs, réseau et volumes portent le même nom quel que soit le dossier.
+name: p8-energy
+
+services:
+  mlflow:
+    # L'image du pipeline contient déjà MLflow (version figée) : pas d'image supplémentaire.
+    build:
+      context: .
+      target: train
+    image: p8-energy-train:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    # --serve-artifacts : le client envoie ses artefacts par HTTP au serveur.
+    # Workers gunicorn « gthread » : sinon les connexions gardées ouvertes par le navigateur
+    # bloquent les workers et l'interface ne se charge plus.
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --serve-artifacts
+      --gunicorn-opts "--worker-class gthread --threads 8 --timeout 120"
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+    volumes:
+      - mlflow_store:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  pipeline:
+    build:
+      context: .
+      target: train
+    image: p8-energy-train:${IMAGE_TAG:-local}
+    command: ["dvc", "repro"]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      # L'UID de l'hôte peut ne pas exister dans l'image : on fixe le nom d'utilisateur.
+      USER: app
+      LOGNAME: app
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    # Le dépôt est monté : dvc.lock, les données et les modèles restent sur l'hôte.
+    # Sous Linux, mettre HOST_UID/HOST_GID (id -u / id -g) dans .env pour écrire dans le dossier.
+    user: "${HOST_UID:-999}:${HOST_GID:-999}"
+    volumes:
+      - .:/app
+
+volumes:
+  mlflow_store:
