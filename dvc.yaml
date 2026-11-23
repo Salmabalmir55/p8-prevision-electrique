@@ -27,3 +27,17 @@ stages:
     metrics:
       - reports/data_quality.json:
           cache: false
+
+  train:
+    cmd: python -m src.train
+    deps:
+      - data/processed/train.csv
+      - src/common.py
+      - src/forecasters.py
+      - src/tracking.py
+      - src/train.py
+    params:
+      - candidates
+      - models
+    outs:
+      - models/candidates.joblib
