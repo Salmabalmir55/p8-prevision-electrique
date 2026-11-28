@@ -41,3 +41,26 @@ stages:
       - models
     outs:
       - models/candidates.joblib
+
+  evaluate:
+    cmd: python -m src.evaluate
+    deps:
+      - data/processed/train.csv
+      - data/processed/test.csv
+      - models/candidates.joblib
+      - src/backtest.py
+      - src/common.py
+      - src/evaluate.py
+      - src/forecasters.py
+    params:
+      - backtest
+      - evaluation
+    metrics:
+      - reports/metrics.json:
+          cache: false
+    plots:
+      - reports/forecast_long.csv:
+          cache: false
+      - reports/figures/forecast_long.png:
+          cache: false
+
