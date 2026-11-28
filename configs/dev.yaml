@@ -1,0 +1,5 @@
+# Développement : horizon court pour itérer vite, journaux détaillés.
+environment: dev
+forecast_horizon_default: 7
+forecast_horizon_max: 30
+log_level: debug

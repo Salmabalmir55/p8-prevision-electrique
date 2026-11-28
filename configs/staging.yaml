@@ -1,0 +1,5 @@
+# Préproduction : mêmes limites que la production pour valider le comportement réel.
+environment: staging
+forecast_horizon_default: 30
+forecast_horizon_max: 180
+log_level: info

@@ -15,3 +15,5 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["B019"]  # lru_cache sur méthode : instance unique et durable dans l'API
+

@@ -1,0 +1,5 @@
+# Production : horizon plafonné à 180 jours, l'horizon validé par le backtest long terme.
+environment: prod
+forecast_horizon_default: 30
+forecast_horizon_max: 180
+log_level: warning
