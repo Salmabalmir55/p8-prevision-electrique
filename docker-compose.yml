@@ -1,11 +1,24 @@
-# Suivi d'expériences et pipeline :
+# Déploiement : suivi d'expériences, pipeline et trois environnements d'API.
 #
 #   docker compose up --build -d
 #
-# Ordre de démarrage : mlflow (sain) -> pipeline (dvc repro, traces envoyées au serveur MLflow).
+# Ordre de démarrage : mlflow (sain) -> pipeline (dvc repro terminé avec succès) -> APIs.
+# Les trois APIs utilisent la même image ; seule la variable APP_ENV change leur configuration.
 
 # Nom de projet fixe : conteneurs, réseau et volumes portent le même nom quel que soit le dossier.
 name: p8-energy
+
+x-api: &api
+  build:
+    context: .
+    target: api
+  image: p8-energy-api:${IMAGE_TAG:-local}
+  restart: unless-stopped
+  depends_on:
+    pipeline:
+      condition: service_completed_successfully
+  volumes:
+    - ./models:/app/models:ro
 
 services:
   mlflow:
@@ -54,6 +67,27 @@ services:
     user: "${HOST_UID:-999}:${HOST_GID:-999}"
     volumes:
       - .:/app
+
+  api-dev:
+    <<: *api
+    environment:
+      APP_ENV: dev
+    ports:
+      - "${DEV_PORT:-8001}:8000"
+
+  api-staging:
+    <<: *api
+    environment:
+      APP_ENV: staging
+    ports:
+      - "${STAGING_PORT:-8002}:8000"
+
+  api-prod:
+    <<: *api
+    environment:
+      APP_ENV: prod
+    ports:
+      - "${PROD_PORT:-8003}:8000"
 
 volumes:
   mlflow_store:
