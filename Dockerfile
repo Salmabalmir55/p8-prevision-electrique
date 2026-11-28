@@ -1,6 +1,8 @@
-# Image du pipeline (cible « train ») : exécute `dvc repro` dans un environnement identique
-# sur toute machine. Construction multi-étapes : les dépendances sont installées dans un
-# environnement virtuel, puis seul ce dernier est copié dans l'image finale.
+# Construction multi-étapes :
+#   - api   : image de service légère (FastAPI + bibliothèques d'inférence), sans PyTorch ni DVC.
+#   - train : image du pipeline (DVC, MLflow, PyTorch CPU) qui exécute `dvc repro`.
+# Les dépendances sont installées dans un environnement virtuel, puis seul ce dernier
+# est copié dans l'image finale.
 
 ARG PYTHON_VERSION=3.11
 
@@ -15,16 +17,34 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH=/opt/venv/bin:$PATH
 WORKDIR /app
 
-# ---------- Dépendances du pipeline ----------
-FROM base AS train-deps
+# ---------- Dépendances ----------
+# Le service n'installe que requirements/api.txt ; le pipeline y ajoute requirements/train.txt.
+FROM base AS api-deps
 RUN python -m venv /opt/venv
 COPY requirements/ requirements/
+RUN pip install -r requirements/api.txt
+
+FROM api-deps AS train-deps
 RUN pip install -r requirements/train.txt
 
 # ---------- Socle d'exécution : utilisateur non privilégié ----------
 FROM base AS runtime
 # UID/GID fixes et explicites : identiques d'une construction à l'autre.
 RUN groupadd --gid 999 app && useradd --uid 999 --gid 999 --home-dir /app --no-create-home app
+
+# ---------- Image de service ----------
+FROM runtime AS api
+COPY --from=api-deps /opt/venv /opt/venv
+COPY --chown=app:app src/ src/
+COPY --chown=app:app configs/ configs/
+RUN mkdir -p models && chown app:app models
+USER app
+ENV APP_ENV=dev \
+    MODEL_PATH=/app/models/forecaster.joblib
+EXPOSE 8000
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
+CMD ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # ---------- Image du pipeline ----------
 FROM runtime AS train

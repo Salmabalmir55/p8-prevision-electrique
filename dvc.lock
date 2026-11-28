@@ -69,12 +69,12 @@ stages:
       size: 16036
     - path: src/tracking.py
       hash: md5
-      md5: 64f2652833856ef3d97007b5a1f61519
-      size: 2079
+      md5: 5a8bfe2474bdbda1f10301605001a1ca
+      size: 2140
     - path: src/train.py
       hash: md5
-      md5: 4faddfb7a6aeefce95cdeb18eec0655b
-      size: 2616
+      md5: 790740dfca7cd28f102a9c940f3d5a77
+      size: 2686
     params:
       params.yaml:
         candidates:
@@ -112,5 +112,124 @@ stages:
     outs:
     - path: models/candidates.joblib
       hash: md5
-      md5: 9ee64ba7743d835fc082c6b84db5fe16
-      size: 13559142
+      md5: dda775d52e137175f07fe5ff0c1183b0
+      size: 13559270
+  evaluate:
+    cmd: python -m src.evaluate
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 2f8fb9227c2f54d72bee2d431ab15d96
+      size: 9075
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 852b99fe3523b96c63cf392f9d48275c
+      size: 97282
+    - path: models/candidates.joblib
+      hash: md5
+      md5: dda775d52e137175f07fe5ff0c1183b0
+      size: 13559270
+    - path: src/backtest.py
+      hash: md5
+      md5: dcc4e8cea13bb0c42538bedccea98043
+      size: 1835
+    - path: src/common.py
+      hash: md5
+      md5: d5097e4df3ac2ff6a9bf53d1e62926be
+      size: 3531
+    - path: src/evaluate.py
+      hash: md5
+      md5: bbfe652d507de8f85357865b3e284662
+      size: 6232
+    - path: src/forecasters.py
+      hash: md5
+      md5: 86f93a098accc8781359e88040a0a874
+      size: 16036
+    params:
+      params.yaml:
+        backtest:
+          short:
+            horizon_days: 7
+            step_days: 7
+          long:
+            horizon_days: 180
+            step_days: 30
+        evaluation:
+          max_mape_short: 3.5
+          max_mape_long: 5.0
+          must_beat_baseline: true
+    outs:
+    - path: reports/figures/forecast_long.png
+      hash: md5
+      md5: 26f9393184f7cb7d78491bce47019ae5
+      size: 210419
+    - path: reports/forecast_long.csv
+      hash: md5
+      md5: a40a3246c728024d19bfe06878194a38
+      size: 20312
+    - path: reports/metrics.json
+      hash: md5
+      md5: 23635e615b89eaed05ef3ebe3b758549
+      size: 2244
+  package:
+    cmd: python -m src.package
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 2f8fb9227c2f54d72bee2d431ab15d96
+      size: 9075
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 852b99fe3523b96c63cf392f9d48275c
+      size: 97282
+    - path: models/candidates.joblib
+      hash: md5
+      md5: dda775d52e137175f07fe5ff0c1183b0
+      size: 13559270
+    - path: reports/metrics.json
+      hash: md5
+      md5: 23635e615b89eaed05ef3ebe3b758549
+      size: 2244
+    - path: src/forecasters.py
+      hash: md5
+      md5: 86f93a098accc8781359e88040a0a874
+      size: 16036
+    - path: src/package.py
+      hash: md5
+      md5: 046d12a1991b0581a0bc2323c268f374
+      size: 3469
+    params:
+      params.yaml:
+        models:
+          naive:
+            season: 7
+          ridge:
+            lags:
+            - 1
+            - 7
+            - 14
+            alpha: 1.0
+            fourier_order: 3
+          arima:
+            order:
+            - 2
+            - 0
+            - 1
+            fourier_order: 3
+          prophet:
+            changepoint_prior_scale: 0.05
+            yearly_fourier_order: 10
+          lstm:
+            window: 28
+            hidden_size: 32
+            epochs: 40
+            learning_rate: 0.005
+            batch_size: 64
+            seed: 42
+        serving:
+          short_term_max_days: 14
+    outs:
+    - path: models/forecaster.joblib
+      hash: md5
+      md5: df5049953716e4df1cf9b94e342fda59
+      size: 713820

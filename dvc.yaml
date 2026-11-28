@@ -41,3 +41,51 @@ stages:
       - models
     outs:
       - models/candidates.joblib
+
+  evaluate:
+    cmd: python -m src.evaluate
+    deps:
+      - data/processed/train.csv
+      - data/processed/test.csv
+      - models/candidates.joblib
+      - src/backtest.py
+      - src/common.py
+      - src/evaluate.py
+      - src/forecasters.py
+    params:
+      - backtest
+      - evaluation
+    metrics:
+      - reports/metrics.json:
+          cache: false
+    plots:
+      - reports/forecast_long.csv:
+          cache: false
+      - reports/figures/forecast_long.png:
+          cache: false
+
+  
+  package:
+    cmd: python -m src.package
+    deps:
+      - data/processed/train.csv
+      - data/processed/test.csv
+      - models/candidates.joblib
+      - reports/metrics.json
+      - src/forecasters.py
+      - src/package.py
+    params:
+      - models
+      - serving
+    outs:
+      - models/forecaster.joblib
+
+plots:
+  # Comparaison des prévisions à 180 jours de chaque modèle avec la consommation réelle 2017.
+  - reports/forecast_long.csv:
+      x: date
+      y:
+        reports/forecast_long.csv: [actual, naive, ridge, arima, prophet, lstm]
+      title: Prévision à 180 jours depuis le 31/12/2016 (GWh)
+
+
