@@ -32,11 +32,14 @@ COPY --from=train-deps /opt/venv /opt/venv
 COPY --chown=app:app src/ src/
 COPY --chown=app:app .dvc/config .dvc/config
 COPY --chown=app:app dvc.yaml dvc.lock params.yaml .dvcignore ./
-RUN mkdir -p data/raw data/processed models reports \
-    && chown -R app:app /app
+# /mlflow : stockage du serveur MLflow quand cette image sert aussi de serveur de suivi.
+RUN mkdir -p data/raw data/processed models reports /mlflow \
+    && chown -R app:app /app /mlflow
 USER app
 # HOME accessible en écriture pour les caches de DVC et matplotlib ; USER pour DVC.
+# L'image n'a pas l'exécutable git : on évite l'avertissement de MLflow qui le cherche.
 ENV HOME=/tmp \
     USER=app \
-    MPLCONFIGDIR=/tmp/matplotlib
+    MPLCONFIGDIR=/tmp/matplotlib \
+    GIT_PYTHON_REFRESH=quiet
 CMD ["dvc", "repro"]

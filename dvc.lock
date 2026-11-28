@@ -31,8 +31,8 @@ stages:
       size: 3531
     - path: src/prepare_data.py
       hash: md5
-      md5: f2e428d8b5d27d3129969ea9257aa3ee
-      size: 3787
+      md5: 8f8b74b2c51ddc8fda5e289368aa1661
+      size: 3878
     params:
       params.yaml:
         data.max_gwh: 2000
@@ -52,3 +52,65 @@ stages:
       hash: md5
       md5: 16c5e9c879ce0889ca24d0fdd10a94d7
       size: 278
+  train:
+    cmd: python -m src.train
+    deps:
+    - path: data/processed/train.csv
+      hash: md5
+      md5: 852b99fe3523b96c63cf392f9d48275c
+      size: 97282
+    - path: src/common.py
+      hash: md5
+      md5: d5097e4df3ac2ff6a9bf53d1e62926be
+      size: 3531
+    - path: src/forecasters.py
+      hash: md5
+      md5: 86f93a098accc8781359e88040a0a874
+      size: 16036
+    - path: src/tracking.py
+      hash: md5
+      md5: 64f2652833856ef3d97007b5a1f61519
+      size: 2079
+    - path: src/train.py
+      hash: md5
+      md5: 4faddfb7a6aeefce95cdeb18eec0655b
+      size: 2616
+    params:
+      params.yaml:
+        candidates:
+        - naive
+        - ridge
+        - arima
+        - prophet
+        - lstm
+        models:
+          naive:
+            season: 7
+          ridge:
+            lags:
+            - 1
+            - 7
+            - 14
+            alpha: 1.0
+            fourier_order: 3
+          arima:
+            order:
+            - 2
+            - 0
+            - 1
+            fourier_order: 3
+          prophet:
+            changepoint_prior_scale: 0.05
+            yearly_fourier_order: 10
+          lstm:
+            window: 28
+            hidden_size: 32
+            epochs: 40
+            learning_rate: 0.005
+            batch_size: 64
+            seed: 42
+    outs:
+    - path: models/candidates.joblib
+      hash: md5
+      md5: 9ee64ba7743d835fc082c6b84db5fe16
+      size: 13559142

@@ -1,0 +1,40 @@
+name: CI MLOps
+
+# Déclenchée à chaque push et à chaque pull request vers les branches partagées.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Une nouvelle exécution sur la même branche annule la précédente.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualite:
+    name: Qualité du code et tests unitaires
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements/*.txt
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Analyse statique (ruff)
+        run: ruff check src tests
+
+      - name: Formatage homogène (ruff format)
+        run: ruff format --check src tests
+
+      - name: Tests unitaires
+        run: pytest -v

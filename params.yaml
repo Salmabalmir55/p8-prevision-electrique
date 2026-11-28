@@ -41,3 +41,5 @@ backtest:
   long:
     horizon_days: 180
     step_days: 30
+# Modèles entraînés et comparés par le pipeline.
+candidates: [naive, ridge, arima, prophet, lstm]
