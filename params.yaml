@@ -45,8 +45,12 @@ backtest:
 # Modèles entraînés et comparés par le pipeline.
 candidates: [naive, ridge, arima, prophet, lstm]
 
-
 evaluation:
   max_mape_short: 3.5
   max_mape_long: 5.0
   must_beat_baseline: true
+
+
+serving:
+  # Au-delà de ce nombre de jours, l'API utilise le modèle retenu pour le long terme.
+  short_term_max_days: 14
